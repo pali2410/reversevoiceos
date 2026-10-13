@@ -1,0 +1,6 @@
+@echo off
+title Starting VoiceOS...
+cd /d "C:\Users\pali\Downloads\VoiceOS_ReverseEngineered\Desktop_App_Portable"
+echo Starting VoiceOS Desktop App...
+start "" "VoiceOS.exe" --no-sandbox
+exit

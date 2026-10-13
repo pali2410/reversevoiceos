@@ -1,0 +1,1212 @@
+{
+  "schemaVersion": 1,
+  "id": "com.rithvik.manus",
+  "version": "2.11.8",
+  "name": "Manus",
+  "summary": "Have Manus do tasks for you by voice.",
+  "description": "Start Manus tasks by voice and follow them live in the notch. Open, search, and continue any of your Manus chats.",
+  "icon": "icon.png",
+  "categories": [
+    "Productivity",
+    "Task Management"
+  ],
+  "supportedPlatforms": [
+    "darwin",
+    "win32"
+  ],
+  "publisher": {
+    "id": "voiceos",
+    "name": "VoiceOS"
+  },
+  "runtime": {
+    "kind": "local-mcp",
+    "command": "bun",
+    "args": [
+      "server.ts"
+    ]
+  },
+  "permissions": [
+    {
+      "kind": "network",
+      "domains": [
+        "api.manus.ai"
+      ]
+    },
+    {
+      "kind": "notify"
+    }
+  ],
+  "preferences": [
+    {
+      "name": "MANUS_API_KEY",
+      "title": "Manus API key",
+      "description": "In Manus: Settings → Developers → API keys → Create new → Copy key. Paste here.",
+      "type": "password",
+      "required": false,
+      "placeholder": "sk-..."
+    },
+    {
+      "name": "MANUS_NOTIFY",
+      "title": "Show notifications from Manus",
+      "description": "Show a notch notification when Manus finishes a task or needs your input.",
+      "type": "boolean",
+      "default": true
+    },
+    {
+      "name": "MANUS_REVIEW_SEND",
+      "title": "Review before sending",
+      "description": "Manus opens with your words typed in, and you tap send. Off sends right away.",
+      "type": "boolean",
+      "default": false
+    }
+  ],
+  "tools": [
+    {
+      "name": "manus_dispatch",
+      "title": "Start a task",
+      "description": "Give Manus a job by voice. It works in the background, keeps going in the chat you're in when you follow up, and tells you when it's done.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "description": "The user's request in their own words. KEEP where-it-goes words exactly as said ('in a new chat', 'new task', 'separately'): the server routes on them and removes them before Manus sees the task."
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "agent",
+              "chat",
+              "adaptive"
+            ],
+            "description": "Task mode. Default agent."
+          },
+          "profile": {
+            "type": "string",
+            "enum": [
+              "standard",
+              "lite",
+              "max"
+            ],
+            "description": "ONLY when the user explicitly names a model (Max / Lite / standard). Otherwise omit: the saved default applies."
+          },
+          "task_id": {
+            "type": "string",
+            "description": "Existing task id to continue (multi-turn)."
+          },
+          "new_chat": {
+            "type": "boolean",
+            "description": "ALWAYS set true when the user says to start fresh, in any wording: 'new chat', 'new task', 'open a new chat and …', 'in a fresh chat', 'separately'. Always a brand-new Manus chat, never the open or waiting one. Keep his words in prompt too ('open a new chat and do 5x5' → prompt 'open a new chat and do 5x5', new_chat true)."
+          },
+          "project_id": {
+            "type": "string",
+            "description": "Optional project to file this task under (from manus_projects)."
+          },
+          "project": {
+            "type": "string",
+            "description": "Set ONLY when the user names a Manus project for a NEW task: 'in my X project, …', 'put this in my X workspace', 'X project: …'. Pass the name as said; the server resolves it. Otherwise omit: the server files a new task under the project it clearly belongs to on its own."
+          },
+          "session": {
+            "type": "string",
+            "description": "Set this ONLY when the user NAMES or DESCRIBES a specific existing Manus chat to send this into: 'check in on X', 'follow up on X', 'in my chat where I was doing X, ask it to …', 'tell my X chat to …', 'in the X conversation, …'. Pass the chat's topic/title as the user described it. One match → follow-up in that chat (any age — the user pointed at it); several → pick-one card; none → new task. Do NOT set this for a plain follow-up with no named chat ('actually make it shorter', 'the same but for Europe') — just pass prompt: the server continues the chat the user has open in the notch, or a recent one (including chats made in the Manus app), automatically when appropriate."
+          },
+          "attach": {
+            "type": "string",
+            "enum": [
+              "screenshot"
+            ],
+            "description": "ONLY when the user wants Manus to see their screen: 'what I'm looking at', 'my screen', 'a screenshot', 'this' while pointing at the screen → screenshot. The screenshot shows in Manus's box for the user to send."
+          },
+          "intent": {
+            "type": "string",
+            "enum": [
+              "new",
+              "existing",
+              "unclear"
+            ],
+            "description": "ALWAYS set it. 'new' when the user asks Manus for a new piece of work (even one like an earlier task, or the same kind of thing for a different month, person, place or audience). 'existing' when they act on, change, ask about or answer something Manus already made or asked ('the list', 'those emails', 'make it shorter', 'also add', 'go ahead and post those'). 'unclear' if you cannot tell."
+          },
+          "route": {
+            "type": "string",
+            "description": "ONLY on a second call, after manus_dispatch answered NOT SENT YET with a numbered list of chats: '1'..'N' for that chat, 'new', or 'ask', chosen by the rules in that answer. Pass the same prompt as the first call."
+          },
+          "reference": {
+            "type": "string",
+            "description": "ONLY when the user says to use ANOTHER existing Manus chat as context ('using my CRM chat', 'based on the Tokyo trip chat'): that chat's topic as said. It is attached as a reference, not continued."
+          }
+        },
+        "required": [
+          "prompt"
+        ],
+        "additionalProperties": false
+      },
+      "hidePermissionToggle": true
+    },
+    {
+      "name": "manus_task",
+      "title": "Open a chat",
+      "description": "Open any Manus chat in the notch by name. It opens at your latest message, and you can scroll up through the whole chat.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "description": "The exact Manus task id, when you have it from a row. Omit and use query when the user names a chat by title/topic."
+          },
+          "query": {
+            "type": "string",
+            "description": "The chat name/topic the user said, when you do NOT have an exact id. The server resolves it (one match opens; several → a pick-list). Pass this OR task_id, never both."
+          },
+          "draft": {
+            "type": "string",
+            "description": "Text to pre-fill in the chat's composer (NOT sent)."
+          },
+          "embed": {
+            "type": "boolean",
+            "description": "Internal (card use): include the rendered chat body for an in-card swap."
+          },
+          "since": {
+            "type": "number",
+            "description": "Card-internal. With no task_id: opens the newest task started after this time (ms since epoch); none → an empty reply."
+          },
+          "poll": {
+            "type": "boolean",
+            "description": "Card-internal: a status poll; the reply carries no card."
+          },
+          "snap": {
+            "type": "string",
+            "description": "Card-internal: the list snapshot nonce a row was tapped from (records the open so a reopen can restore it)."
+          },
+          "reopen_snap": {
+            "type": "string",
+            "description": "Card-internal: on a list-card reopen, the snapshot nonce; the server returns the chat last opened from that snapshot, or none."
+          },
+          "z": {
+            "type": "number",
+            "description": "Card-internal: the card can inflate a deflated body, so the whole chat may ride as card_body_z."
+          },
+          "thread_before": {
+            "type": "number",
+            "description": "Card-internal: scroll-up paging, the index of the oldest turn the card holds; the reply is the earlier turns as thread_html."
+          },
+          "thread_turn": {
+            "type": "number",
+            "description": "Card-internal: Show more, the turn index whose full reply the card wants as thread_html."
+          }
+        },
+        "additionalProperties": false
+      },
+      "uiCallable": true,
+      "hidePermissionToggle": true,
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "manus_send",
+      "title": "Reply in a chat",
+      "description": "Answer Manus's question or send a follow-up in the chat that's open.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "description": "The follow-up message or task for Manus."
+          },
+          "task_id": {
+            "type": "string",
+            "description": "Existing task id to continue (the follow-up target)."
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "agent",
+              "chat",
+              "adaptive"
+            ],
+            "description": "Task mode. Default agent."
+          },
+          "profile": {
+            "type": "string",
+            "enum": [
+              "standard",
+              "lite",
+              "max"
+            ],
+            "description": "Agent profile. Default standard."
+          },
+          "project_id": {
+            "type": "string",
+            "description": "Optional project id."
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Card-only: attached file tokens."
+          },
+          "task_references": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Card-only: chats referenced as context."
+          },
+          "skills": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Card-only: skills picked in the ＋ menu."
+          },
+          "connectors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Card-only: connectors picked in the ＋ menu."
+          }
+        },
+        "required": [
+          "prompt"
+        ],
+        "additionalProperties": false
+      },
+      "uiCallable": true,
+      "hidePermissionToggle": true
+    },
+    {
+      "name": "manus_stop",
+      "title": "Stop a task",
+      "description": "Stop what Manus is working on. Send it a message later to pick it back up.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "description": "The id of the running task to stop."
+          },
+          "embed": {
+            "type": "boolean",
+            "description": "Internal, set by the card's stop button: include the stopped chat as card_body."
+          }
+        },
+        "required": [
+          "task_id"
+        ],
+        "additionalProperties": false
+      },
+      "uiCallable": true,
+      "hidePermissionToggle": true
+    },
+    {
+      "name": "manus_confirm",
+      "title": "Confirm a step",
+      "description": "Approve a step Manus paused on, like sending an email or deploying, or skip it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "description": "The waiting task's id."
+          },
+          "choice": {
+            "type": "string",
+            "enum": [
+              "send",
+              "draft",
+              "accept",
+              "reject",
+              "standard",
+              "premium",
+              "skip"
+            ],
+            "description": "The user's explicit choice for the pending step."
+          },
+          "event_id": {
+            "type": "string",
+            "description": "Internal, set by a card button: the step the card showed. Never pass it."
+          },
+          "embed": {
+            "type": "boolean",
+            "description": "Internal. Never pass it."
+          }
+        },
+        "required": [
+          "task_id",
+          "choice"
+        ],
+        "additionalProperties": false
+      },
+      "uiCallable": true,
+      "visibility": "agent",
+      "hidePermissionToggle": true
+    },
+    {
+      "name": "manus_inbox",
+      "title": "Check your inbox",
+      "description": "See what's running, what needs your reply, and what finished that you haven't read.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "string",
+            "description": "Optional Manus project name to scope to, when the user says 'in the X project' / 'inside my X project' / 'in my X workspace'. Pass the name as said; the server resolves it."
+          }
+        },
+        "additionalProperties": false
+      },
+      "uiCallable": true,
+      "hidePermissionToggle": true,
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "manus_history",
+      "title": "Find past chats",
+      "description": "Search your chats by topic or by day, like \"yesterday\". Tap one to open it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "day": {
+            "type": "string",
+            "description": "REQUIRED whenever the request names a day. 'yesterday' for 'what did I ask/say to Manus yesterday', 'today' for today, or YYYY-MM-DD for a date. The server filters by the user's local calendar day. NEVER put a day word into query."
+          },
+          "query": {
+            "type": "string",
+            "description": "Search term over task title/content."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "running",
+              "completed",
+              "failed"
+            ],
+            "description": "Filter by status."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Max tasks (default 8)."
+          },
+          "project": {
+            "type": "string",
+            "description": "Optional Manus project name to scope to ('in the X project' / 'inside my X project'). Pass the name as said; the server resolves it."
+          },
+          "embed": {
+            "type": "boolean",
+            "description": "Internal, set by a card tap: return the list as card_body for an in-place swap."
+          },
+          "recent": {
+            "type": "boolean",
+            "description": "Internal, set by the card's + > Recent tasks: the 5 newest tasks."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Internal, set by the card's sidebar as it scrolls: the next page of tasks."
+          }
+        },
+        "additionalProperties": false
+      },
+      "uiCallable": true,
+      "hidePermissionToggle": true,
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "manus_computer",
+      "title": "Watch Manus work",
+      "description": "See Manus's live screen and each step it takes on the current task.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "description": "The Manus task id. Omit for the current task: the one running now, else the most recent."
+          }
+        },
+        "additionalProperties": false
+      },
+      "uiCallable": true,
+      "hidePermissionToggle": true,
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "manus_open",
+      "title": "Open in the Manus app",
+      "description": "Opens a chat in the Manus desktop app. Used by the card's Open in Manus button.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "description": "The exact Manus task id, when you have it. Omit and use query when the user names a chat by title/topic."
+          },
+          "query": {
+            "type": "string",
+            "description": "The chat name/topic the user said, when you do NOT have an exact id. The server resolves it. Pass this OR task_id, never both."
+          },
+          "from": {
+            "type": "string",
+            "enum": [
+              "card"
+            ],
+            "description": "Internal, set by a card button. Never pass it."
+          },
+          "relaunch": {
+            "type": "boolean",
+            "description": "Internal, set by a card's Reopen Manus button. Never pass it."
+          },
+          "reopen_token": {
+            "type": "string",
+            "description": "Internal, the one-time token a card's Reopen Manus button carries. Never pass it."
+          }
+        },
+        "additionalProperties": false
+      },
+      "uiCallable": true,
+      "visibility": "agent",
+      "hidePermissionToggle": true
+    },
+    {
+      "name": "manus_model",
+      "title": "Choose the model",
+      "description": "Sets the default Manus model. Used by the card's model menu.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "type": "string",
+            "enum": [
+              "standard",
+              "lite",
+              "max"
+            ],
+            "description": "The model to make the default."
+          }
+        },
+        "required": [
+          "profile"
+        ],
+        "additionalProperties": false
+      },
+      "uiCallable": true,
+      "visibility": "agent",
+      "hidePermissionToggle": true
+    },
+    {
+      "name": "manus_compose",
+      "title": "Show the composer",
+      "description": "Shows the Manus home card to type a new task.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "description": "Optional task text to pre-fill for review. Omit for the empty composer home."
+          },
+          "embed": {
+            "type": "boolean",
+            "description": "Internal, set by a card's New task button: return the home as card_body for an in-place swap."
+          },
+          "ref_task_id": {
+            "type": "string",
+            "description": "Internal (Creations' Edit in new task): a chat to attach to the new task."
+          },
+          "ref_title": {
+            "type": "string",
+            "description": "Internal: that chat's title."
+          }
+        },
+        "additionalProperties": false
+      },
+      "uiCallable": true,
+      "visibility": "agent",
+      "hidePermissionToggle": true
+    },
+    {
+      "name": "manus_result",
+      "title": "Check a result",
+      "description": "Says whether your latest task is done and shows the answer.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "description": "Optional specific task id."
+          }
+        },
+        "additionalProperties": false
+      },
+      "visibility": "agent",
+      "hidePermissionToggle": true,
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "manus_attach",
+      "title": "Attach a file",
+      "description": "Puts a screenshot in Manus's box for you to send.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "screenshot"
+            ],
+            "description": "screenshot (the only source)."
+          },
+          "prompt": {
+            "type": "string",
+            "description": "Optional words to type in with the file."
+          },
+          "task_id": {
+            "type": "string",
+            "description": "Optional chat to attach it in."
+          }
+        },
+        "additionalProperties": false
+      },
+      "uiCallable": true,
+      "visibility": "agent",
+      "hidePermissionToggle": true
+    },
+    {
+      "name": "manus_creations",
+      "title": "Show creations",
+      "description": "Shows the websites, games and apps Manus built.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "website",
+              "game",
+              "mobile_app"
+            ],
+            "description": "Optional: only this kind."
+          },
+          "embed": {
+            "type": "boolean",
+            "description": "Internal, set by the ＋ menu's Open Creations: return Creations as card_body. Never pass it."
+          }
+        },
+        "additionalProperties": false
+      },
+      "visibility": "agent",
+      "hidePermissionToggle": true,
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "manus_publish",
+      "title": "Publish a website",
+      "description": "Publishes a Manus website from the card. Always asks first.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string"
+          },
+          "website_id": {
+            "type": "string"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "private",
+              "team",
+              "public"
+            ]
+          },
+          "token": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "uiCallable": true,
+      "visibility": "agent",
+      "hidePermissionToggle": true
+    },
+    {
+      "name": "manus_credits",
+      "title": "Check credits",
+      "description": "Shows your Manus credits and what recent tasks used.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "visibility": "agent",
+      "hidePermissionToggle": true,
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "manus_skills",
+      "title": "Show skills",
+      "description": "Lists the skills in your Manus account. Tap one to see what it does.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "visibility": "agent",
+      "hidePermissionToggle": true,
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "manus_connectors",
+      "title": "Show Manus connectors",
+      "description": "Lists the connectors in your Manus account, like Gmail or Notion, and switches them on for new tasks.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "set": {
+            "type": "string",
+            "description": "Internal (the card's switch): a connector id to switch on or off for new tasks."
+          },
+          "on": {
+            "type": "boolean",
+            "description": "Internal: with set, on or off."
+          }
+        },
+        "additionalProperties": false
+      },
+      "uiCallable": true,
+      "visibility": "agent",
+      "hidePermissionToggle": true
+    },
+    {
+      "name": "manus_projects",
+      "title": "List projects",
+      "description": "Lists your Manus projects.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "description": "Max projects (default 10)."
+          }
+        },
+        "additionalProperties": false
+      },
+      "visibility": "agent",
+      "hidePermissionToggle": true,
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "manus_new_project",
+      "title": "Create a project",
+      "description": "Makes a new Manus project.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The project name."
+          },
+          "instruction": {
+            "type": "string",
+            "description": "Optional default instruction for tasks in this project."
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "visibility": "agent",
+      "hidePermissionToggle": true
+    },
+    {
+      "name": "manus_files",
+      "title": "List files",
+      "description": "Lists recent files Manus made.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "documents",
+              "slides",
+              "spreadsheets",
+              "images",
+              "videos",
+              "audio",
+              "others"
+            ],
+            "description": "Optional Library tab when the user names a kind ('my Manus slides' → slides, 'PDFs' → documents)."
+          },
+          "embed": {
+            "type": "boolean",
+            "description": "Internal, set by the ＋ menu's Open Library: return the Library as card_body. Never pass it."
+          }
+        },
+        "additionalProperties": false
+      },
+      "uiCallable": true,
+      "visibility": "agent",
+      "hidePermissionToggle": true,
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "manus_rename",
+      "title": "Rename a chat",
+      "description": "Changes a chat's title.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "description": "The exact Manus task id, when you have it."
+          },
+          "query": {
+            "type": "string",
+            "description": "The chat name/topic the user said, when you do NOT have an exact id. The server resolves it in the same call. Pass this OR task_id, never both."
+          },
+          "title": {
+            "type": "string",
+            "description": "The new title."
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "additionalProperties": false
+      },
+      "uiCallable": true,
+      "visibility": "agent",
+      "hidePermissionToggle": true
+    },
+    {
+      "name": "manus_share",
+      "title": "Share a chat",
+      "description": "Turns on sharing and gives you a public link.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "description": "The exact Manus task id, when you have it."
+          },
+          "query": {
+            "type": "string",
+            "description": "The chat name/topic the user said, when you do NOT have an exact id. The server resolves it in the same call. Pass this OR task_id, never both."
+          }
+        },
+        "additionalProperties": false
+      },
+      "uiCallable": true,
+      "visibility": "agent",
+      "hidePermissionToggle": true
+    },
+    {
+      "name": "manus_delete",
+      "title": "Delete a chat",
+      "description": "Deletes a chat for good. Always asks first.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "description": "The exact Manus task id, when you have it (always on the confirm call)."
+          },
+          "query": {
+            "type": "string",
+            "description": "The chat name/topic the user said, when you do NOT have an exact id. The server resolves it in the same call. Pass this OR task_id, never both."
+          },
+          "confirm": {
+            "type": "boolean",
+            "description": "Set true ONLY after the user explicitly confirms the deletion by voice."
+          }
+        },
+        "additionalProperties": false
+      },
+      "uiCallable": true,
+      "visibility": "agent",
+      "hidePermissionToggle": true
+    },
+    {
+      "name": "manus_status",
+      "title": "Check connection",
+      "description": "Says whether Manus is connected.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "probe": {
+            "type": "boolean",
+            "description": "Set only by the connect card's watcher."
+          }
+        },
+        "additionalProperties": false
+      },
+      "uiCallable": true,
+      "visibility": "agent",
+      "hidePermissionToggle": true,
+      "annotations": {
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "manus_connect",
+      "title": "Connect Manus",
+      "description": "Connects your Manus account with an API key.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "visibility": "agent",
+      "hidePermissionToggle": true
+    }
+  ],
+  "intents": [
+    {
+      "name": "connect",
+      "tool": "manus_connect",
+      "description": "Connect the user's Manus account or show how: the Connect card with the steps and a link to the Manus API keys page, even when already connected. Use for 'help me get connected with Manus', 'connect Manus', 'set up Manus', 'show me how to connect Manus', 'Manus setup instructions'. Not for checking the connection or running a task.",
+      "utterances": {
+        "en": [
+          "Help me get connected with Manus",
+          "Can you help me get connected with Manus",
+          "Connect Manus",
+          "Connect my Manus account",
+          "Set up Manus",
+          "Help me set up Manus",
+          "Show me how to connect Manus",
+          "How do I connect Manus",
+          "Manus setup instructions",
+          "Manus connect instructions",
+          "Walk me through connecting Manus"
+        ]
+      },
+      "response": {
+        "en": "Checking your Manus connection."
+      }
+    },
+    {
+      "name": "dispatch",
+      "tool": "manus_dispatch",
+      "description": "Send a new task to Manus to work on autonomously. Use whenever the user wants Manus to DO something: 'have Manus ...', 'ask Manus to ...', 'tell Manus to ...', 'get Manus to ...'. Everything the user wants done becomes the prompt. Not for opening, searching, checking, or replying to an existing chat.",
+      "utterances": {
+        "en": [
+          "Have Manus {prompt}",
+          "Ask Manus to {prompt}",
+          "Tell Manus to {prompt}",
+          "Get Manus to {prompt}",
+          "Have Manus go and {prompt}"
+        ]
+      },
+      "slots": {
+        "prompt": {
+          "type": "string",
+          "required": true
+        }
+      },
+      "response": {
+        "en": "Manus is on it."
+      }
+    },
+    {
+      "name": "open_chat",
+      "tool": "manus_task",
+      "description": "Open ONE specific existing Manus chat in the notch by its name or topic. Use for 'open the X chat', 'pull up X', 'open up my X chat', 'check on X'. The chat name the user says becomes the query, which the server resolves to that chat (or a tappable pick-list if several match). Not for starting a new task, the inbox, the recent list, or opening in the desktop app.",
+      "utterances": {
+        "en": [
+          "Open the {query} chat",
+          "Pull up my {query} chat",
+          "Open up {query}",
+          "Open my {query} Manus chat",
+          "Check on {query}"
+        ]
+      },
+      "slots": {
+        "query": {
+          "type": "string",
+          "required": true
+        }
+      },
+      "response": {
+        "en": "Opening that Manus chat."
+      }
+    },
+    {
+      "name": "projects",
+      "tool": "manus_projects",
+      "description": "List the user's Manus projects and workspaces. Use for 'what Manus projects do I have', 'show my Manus projects', 'list my Manus workspaces'.",
+      "utterances": {
+        "en": [
+          "What Manus projects do I have",
+          "Show my Manus projects",
+          "List my Manus workspaces"
+        ]
+      },
+      "response": {
+        "en": "Getting your Manus projects."
+      }
+    },
+    {
+      "name": "files",
+      "tool": "manus_files",
+      "description": "Show recent files Manus has created. Use for 'my Manus files', 'what files has Manus made', 'show my Manus files'.",
+      "utterances": {
+        "en": [
+          "Show my Manus files",
+          "What files has Manus created",
+          "My Manus files"
+        ]
+      },
+      "response": {
+        "en": "Pulling up your Manus files."
+      }
+    },
+    {
+      "name": "inbox",
+      "tool": "manus_inbox",
+      "description": "Show the Manus inbox: tasks running now, tasks waiting for the user's reply, and unread finished tasks. Use for 'what needs my reply', 'what is running', 'anything waiting on me', 'pending tasks'. Not for opening one specific chat, searching past chats, or starting a task.",
+      "utterances": {
+        "en": [
+          "What needs my reply in Manus",
+          "What Manus tasks are running",
+          "Anything waiting on me in Manus",
+          "Show my Manus inbox",
+          "What is Manus waiting on"
+        ]
+      },
+      "response": {
+        "en": "Checking your Manus inbox."
+      }
+    },
+    {
+      "name": "computer",
+      "tool": "manus_computer",
+      "description": "Open the live 'Manus's computer' feed that shows what Manus is doing right now. Use for 'show me Manus's computer', 'what is Manus doing'. Not for reading a finished answer or opening a chat.",
+      "utterances": {
+        "en": [
+          "Show me Manus's computer",
+          "What is Manus doing right now",
+          "Open the Manus computer"
+        ]
+      },
+      "response": {
+        "en": "Opening Manus's computer."
+      }
+    },
+    {
+      "name": "compose",
+      "tool": "manus_compose",
+      "description": "Open the Manus composer home where the user types or dictates a new task. Use for 'show me my Manus agent', 'open Manus'. Not for running a specific task immediately or reading past chats.",
+      "utterances": {
+        "en": [
+          "Show me my Manus agent",
+          "Open Manus",
+          "Open the Manus composer"
+        ]
+      },
+      "response": {
+        "en": "Opening Manus."
+      }
+    },
+    {
+      "name": "history_recent",
+      "tool": "manus_history",
+      "description": "Show the user's recent Manus chats as a tappable list. Use for 'show my recent Manus chats', 'my Manus history'. Not for one specific named chat or a keyword search.",
+      "utterances": {
+        "en": [
+          "Show my recent Manus chats",
+          "Open my Manus history",
+          "What did I ask Manus recently"
+        ]
+      },
+      "response": {
+        "en": "Pulling up your recent Manus chats."
+      }
+    },
+    {
+      "name": "search_history",
+      "tool": "manus_history",
+      "description": "Search the user's past Manus chats for a topic and show the matches as a tappable list. Use for 'find my Manus chats about X', 'search my Manus chats for X'.",
+      "utterances": {
+        "en": [
+          "Find my Manus chats about {query}",
+          "Search my Manus chats for {query}"
+        ]
+      },
+      "slots": {
+        "query": {
+          "type": "string",
+          "required": true
+        }
+      },
+      "response": {
+        "en": "Searching your Manus chats for {query}."
+      }
+    },
+    {
+      "name": "result",
+      "tool": "manus_result",
+      "description": "Show whether the user's most recent Manus task is done and its answer. Use for 'is my Manus task done', 'show my Manus result', 'did Manus finish'. Not for the inbox or a specific older chat.",
+      "utterances": {
+        "en": [
+          "Is my Manus task done",
+          "Show my Manus result",
+          "Did Manus finish"
+        ]
+      },
+      "response": {
+        "en": "Checking your latest Manus task."
+      }
+    },
+    {
+      "name": "status",
+      "tool": "manus_status",
+      "description": "Report whether Manus is connected to VoiceOS. Use for 'is Manus connected'. Not for the inbox or running a task.",
+      "utterances": {
+        "en": [
+          "Is Manus connected",
+          "Check my Manus connection"
+        ]
+      },
+      "response": {
+        "en": "Checking your Manus connection."
+      }
+    },
+    {
+      "name": "credits",
+      "tool": "manus_credits",
+      "description": "Show the user's Manus credit balance and recent credit history. Use for 'how many Manus credits do I have', 'my Manus usage', 'Manus billing'. Read-only.",
+      "utterances": {
+        "en": [
+          "How many Manus credits do I have",
+          "Show my Manus credits",
+          "How many credits do I have left in Manus",
+          "What's my Manus usage",
+          "Show Manus billing"
+        ]
+      },
+      "response": {
+        "en": "Checking your Manus credits."
+      }
+    },
+    {
+      "name": "skills",
+      "tool": "manus_skills",
+      "description": "Show the Skills in the user's Manus account as a tappable list. Use for 'show my Manus skills', 'what skills does Manus have'. Read-only.",
+      "utterances": {
+        "en": [
+          "Show my Manus skills",
+          "What skills does Manus have",
+          "List my Manus skills",
+          "What skills do I have in Manus",
+          "Open my skills in Manus",
+          "Show Manus skills"
+        ]
+      },
+      "response": {
+        "en": "Here are your Manus skills."
+      }
+    },
+    {
+      "name": "connectors",
+      "tool": "manus_connectors",
+      "description": "Show the connectors in the user's MANUS account (Gmail, Notion, custom MCP servers added in Manus) as a tappable list. These are Manus's connectors, not VoiceOS Apps and not VoiceOS MCP settings. Use for 'show my Manus connectors', 'Manus connectors through MCP', 'what is Manus connected to'.",
+      "utterances": {
+        "en": [
+          "Show my Manus connectors",
+          "Show my Manus connectors through MCP",
+          "What connectors does Manus have",
+          "What Manus connectors do I have",
+          "List my Manus connectors",
+          "What is Manus connected to",
+          "Show my Manus MCP connectors",
+          "Show Manus integrations"
+        ]
+      },
+      "response": {
+        "en": "Here are your Manus connectors."
+      }
+    },
+    {
+      "name": "attach",
+      "tool": "manus_attach",
+      "description": "Put a screenshot of what the user is looking at in Manus's box for them to send. Use for 'ask Manus what I'm looking at', 'give Manus my screenshot'. Not for local files (there is no local-file attach).",
+      "utterances": {
+        "en": [
+          "Ask Manus what I'm looking at",
+          "Send Manus a screenshot",
+          "Give Manus my screenshot",
+          "Show Manus my screen"
+        ]
+      },
+      "response": {
+        "en": "Putting it in Manus."
+      }
+    },
+    {
+      "name": "creations",
+      "tool": "manus_creations",
+      "description": "Show what Manus built: websites, games and apps, with each site's live state. Use for 'my Manus websites', 'what has Manus built'.",
+      "utterances": {
+        "en": [
+          "Show my Manus websites",
+          "What has Manus built",
+          "Show my Manus creations",
+          "Is my Manus site live",
+          "Show my Manus games"
+        ]
+      },
+      "response": {
+        "en": "Opening your Manus creations."
+      }
+    },
+    {
+      "name": "publish",
+      "tool": "manus_publish",
+      "description": "Publish a Manus website. Shows the sites with Publish and Visibility; the user taps to publish.",
+      "utterances": {
+        "en": [
+          "Publish my Manus site",
+          "Make my Manus website live",
+          "Publish the website Manus made"
+        ]
+      },
+      "response": {
+        "en": "Here are your sites. Tap Publish to go live."
+      }
+    }
+  ],
+  "asr": {
+    "vocabulary": [
+      "Manus"
+    ]
+  },
+  "setupGuide": {
+    "title": "Connect Manus",
+    "blocks": [
+      {
+        "type": "text",
+        "text": "In Manus, open Settings → Developers → API keys and create a key. Paste it in the Manus API key field below. Your saved key connects Manus automatically."
+      }
+    ]
+  }
+}

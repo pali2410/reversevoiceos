@@ -1,0 +1,6 @@
+@echo off
+title Starting VoiceOS...
+cd /d "%~dp0"
+echo Starting VoiceOS Desktop App...
+start "" "VoiceOS.exe" --no-sandbox
+exit

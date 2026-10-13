@@ -1,0 +1,116 @@
+* {
+  box-sizing: border-box;
+}
+:root {
+  color-scheme: light;
+  /* Match voiceos-blue in landing-page/tailwind.config.js. */
+  --installer-accent: #126ff6;
+}
+html,
+body {
+  margin: 0;
+  width: 660px;
+  height: 440px;
+  overflow: hidden;
+  background: #fff;
+  color: #202b3b;
+  /* Match .intro-sf-pro-font in app/styles/app.css. */
+  font:
+    14px/1.5 "SF Pro Display",
+    "SF Pro Text",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Helvetica Neue",
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.titlebar {
+  z-index: 1;
+  position: absolute;
+  inset: 0 0 auto;
+  height: 40px;
+  -webkit-app-region: drag;
+}
+main {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+h1 {
+  position: absolute;
+  top: 64px;
+  left: 0;
+  right: 0;
+  margin: 0;
+  text-align: center;
+  font-size: 34px;
+  line-height: 1.35;
+  font-weight: 600;
+  letter-spacing: -0.8px;
+}
+h1 em {
+  color: var(--installer-accent);
+  font-style: normal;
+}
+html:lang(ja) h1 {
+  font-size: 28px;
+  line-height: 1.55;
+  letter-spacing: -0.4px;
+}
+.install-item {
+  position: absolute;
+  top: 221px;
+  width: 128px;
+  height: 128px;
+  border-radius: 26px;
+  outline: none;
+}
+.app-item {
+  left: 106px;
+  cursor: grab;
+}
+.app-item:active {
+  cursor: grabbing;
+}
+.folder-item {
+  left: 426px;
+}
+.app-icon,
+.folder {
+  display: block;
+  width: 128px;
+  height: 128px;
+  filter: drop-shadow(0 10px 12px #49617d18);
+}
+.item-label {
+  position: absolute;
+  top: 140px;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  color: #3d4754;
+  font-size: 14px;
+  line-height: 20px;
+}
+.arrow {
+  position: absolute;
+  left: 274px;
+  top: 250px;
+  width: 112px;
+  height: 64px;
+  color: var(--installer-accent);
+  pointer-events: none;
+}
+.install-item:focus-visible,
+.folder-item.drop-ready {
+  outline: 2px solid
+    color-mix(in srgb, var(--installer-accent) 50%, transparent);
+  outline-offset: 6px;
+  background: color-mix(in srgb, var(--installer-accent) 4%, transparent);
+}
+/* Finder supplies the real, draggable icons and labels in the DMG. */
+.dmg-artwork .install-item {
+  visibility: hidden;
+}
